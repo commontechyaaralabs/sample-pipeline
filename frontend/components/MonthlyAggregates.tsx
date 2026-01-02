@@ -7,7 +7,7 @@ interface MonthlyAggregatesProps {
   months?: number;
 }
 
-export default function MonthlyAggregates({ months = 6 }: MonthlyAggregatesProps) {
+export default function MonthlyAggregates({ months = 12 }: MonthlyAggregatesProps) {
   const [aggregates, setAggregates] = useState<MonthlyAggregate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +47,13 @@ export default function MonthlyAggregates({ months = 6 }: MonthlyAggregatesProps
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 text-xl font-semibold text-black dark:text-zinc-50">
+      <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
         Monthly Thread Aggregates
       </h2>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <thead>
-            <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800">
+      <div className="max-h-96 overflow-y-auto overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
+        <table className="w-full border-collapse">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
               <th className="px-4 py-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                 Month
               </th>
@@ -80,7 +80,7 @@ export default function MonthlyAggregates({ months = 6 }: MonthlyAggregatesProps
               return (
                 <tr
                   key={agg.month}
-                  className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  className="border-b border-zinc-100 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                     {agg.month}

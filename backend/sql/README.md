@@ -1,0 +1,68 @@
+# BigQuery Views Setup
+
+## Table Structure
+
+Your actual table: `clariversev1.flipkart_slice.email_raw_slice_001`
+
+This table has:
+- One row per **message** (not per thread)
+- Key fields: `thread_id`, `thread_last_message_at`, `thread_message_count`
+- String timestamps (format: `YYYY-MM-DD HH:MM:SS`)
+
+## Creating Views
+
+### Step 1: Update the SQL file
+
+Edit `views.sql` and replace:
+- `PROJECT_ID` → `clariversev1`
+- `DATASET_ID` → `flipkart_slice`
+- `TABLE_NAME` → `email_raw_slice_001`
+
+### Step 2: Check for sentiment table
+
+The views assume a `message_sentiment` table exists with:
+- `thread_id`
+- `sentiment` (pos/neg/neutral)
+- `confidence`
+- `prompt_version`
+- `model_name`
+- `created_at`
+
+If this table doesn't exist or has a different name, update the `MESSAGE_SENTIMENT_TABLE` environment variable.
+
+### Step 3: Run the SQL
+
+In BigQuery console, run the updated SQL from `views.sql`:
+
+```sql
+-- View: v_thread_list
+CREATE OR REPLACE VIEW `clariversev1.flipkart_slice.v_thread_list` AS
+-- ... (copy from views.sql with replacements)
+```
+
+## Environment Variables
+
+Set these in your backend `.env` or Cloud Run:
+
+```env
+GCP_PROJECT_ID=clariversev1
+BIGQUERY_DATASET_ID=flipkart_slice
+BIGQUERY_EMAIL_RAW_TABLE=email_raw_slice_001
+BIGQUERY_MESSAGE_SENTIMENT_TABLE=message_sentiment
+BIGQUERY_USE_VIEWS=true
+```
+
+## Notes
+
+1. **Thread Status**: Derived from `thread_last_message_at` - threads with activity within 7 days are "open", others are "closed"
+
+2. **Timestamp Parsing**: The table stores timestamps as strings, so we use `PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', ...)` to convert them
+
+3. **Sentiment Defaults**: If a thread has no sentiment data, it defaults to:
+   - `sentiment`: 'neutral'
+   - `confidence`: 0.5
+   - `prompt_version`: 'v0.1'
+   - `model_name`: 'unknown'
+
+4. **Grouping**: Since the table has one row per message, we group by `thread_id` and use `MAX()` to get thread-level aggregates
+

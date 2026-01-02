@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 @router.get("/threads")
-async def list_threads(limit: int = 10) -> List[Dict[str, Any]]:
+async def list_threads(limit: int = 200) -> List[Dict[str, Any]]:
     """
     Retrieve a list of threads.
     
@@ -31,10 +31,10 @@ async def list_threads(limit: int = 10) -> List[Dict[str, Any]]:
         List of thread objects
     """
     try:
-        if limit < 1 or limit > 100:
+        if limit < 1 or limit > 200:
             raise HTTPException(
                 status_code=400,
-                detail="Limit must be between 1 and 100"
+                detail="Limit must be between 1 and 200"
             )
         return get_threads(limit)
     except Exception as e:
