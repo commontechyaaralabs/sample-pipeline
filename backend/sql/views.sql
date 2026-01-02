@@ -1,26 +1,23 @@
 -- BigQuery Views for Thread Analytics
--- Run these in BigQuery to create the views that the backend will query
--- Replace PROJECT_ID, DATASET_ID, and TABLE_NAME with your actual values
--- Example: clariversev1.flipkart_slices.interaction_event
+-- 
+-- IMPORTANT: Backend team creates all tables (interaction_event, thread_state, message_sentiment)
+-- We only create these views that join them for UI consumption.
+--
+-- To use: Replace PROJECT_ID and DATASET_ID with your actual values
+-- Example: clariversev1.flipkart_slices
 
 -- View: v_thread_list
 -- Purpose: Thread list with latest sentiment per thread
--- Source: interaction_event (one row per message, grouped by thread_id)
+-- Source: thread_state (materialized) + message_sentiment
 CREATE OR REPLACE VIEW `PROJECT_ID.DATASET_ID.v_thread_list` AS
 WITH thread_summary AS (
   SELECT
     thread_id,
-    MAX(thread_last_message_at) AS last_message_ts,
-    MAX(thread_message_count) AS message_count,
-    -- Derive thread_status: if last message is recent (within 7 days), consider open
-    CASE 
-      WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(thread_last_message_at), DAY) <= 7 
-      THEN 'open'
-      ELSE 'closed'
-    END AS thread_status
-  FROM `PROJECT_ID.DATASET_ID.TABLE_NAME`
+    last_message_ts,
+    message_count,
+    thread_status
+  FROM `PROJECT_ID.DATASET_ID.thread_state`
   WHERE thread_id IS NOT NULL
-  GROUP BY thread_id
 ),
 latest_sentiment AS (
   SELECT
@@ -56,15 +53,14 @@ ORDER BY t.last_message_ts DESC;
 
 -- View: v_monthly_thread_aggregates
 -- Purpose: Monthly aggregates with sentiment distribution
--- Source: interaction_event (one row per message, grouped by thread_id)
+-- Source: thread_state (materialized) + message_sentiment
 CREATE OR REPLACE VIEW `PROJECT_ID.DATASET_ID.v_monthly_thread_aggregates` AS
 WITH thread_summary AS (
   SELECT
     thread_id,
-    MAX(thread_last_message_at) AS last_message_ts
-  FROM `PROJECT_ID.DATASET_ID.TABLE_NAME`
+    last_message_ts
+  FROM `PROJECT_ID.DATASET_ID.thread_state`
   WHERE thread_id IS NOT NULL
-  GROUP BY thread_id
 ),
 latest_sentiment AS (
   SELECT

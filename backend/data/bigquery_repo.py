@@ -30,8 +30,9 @@ THREAD_LIST_VIEW = os.getenv("BIGQUERY_THREAD_LIST_VIEW", "v_thread_list")
 MONTHLY_AGGREGATES_VIEW = os.getenv("BIGQUERY_MONTHLY_AGGREGATES_VIEW", "v_monthly_thread_aggregates")
 
 # Table names (fallback if views don't exist)
-# Default to the actual table: clariversev1.flipkart_slices.interaction_event
+# Default to the actual tables: clariversev1.flipkart_slices.*
 EMAIL_RAW_TABLE = os.getenv("BIGQUERY_EMAIL_RAW_TABLE", "interaction_event")
+THREAD_STATE_TABLE = os.getenv("BIGQUERY_THREAD_STATE_TABLE", "thread_state")
 MESSAGE_SENTIMENT_TABLE = os.getenv("BIGQUERY_MESSAGE_SENTIMENT_TABLE", "message_sentiment")
 
 # Whether to use views (preferred) or direct table queries
@@ -61,21 +62,16 @@ def get_threads(limit: int) -> List[Dict[str, Any]]:
         """
     else:
         # Direct table query (fallback if views don't exist)
-        # Works with email_raw_slice_001 table structure
+        # Uses materialized thread_state table
         query = f"""
         WITH thread_summary AS (
           SELECT
             thread_id,
-            MAX(thread_last_message_at) AS last_message_ts,
-            MAX(thread_message_count) AS message_count,
-            CASE 
-              WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(thread_last_message_at), DAY) <= 7 
-              THEN 'open'
-              ELSE 'closed'
-            END AS thread_status
-          FROM {_get_table_name(EMAIL_RAW_TABLE)}
+            last_message_ts,
+            message_count,
+            thread_status
+          FROM {_get_table_name(THREAD_STATE_TABLE)}
           WHERE thread_id IS NOT NULL
-          GROUP BY thread_id
         ),
         latest_sentiment AS (
           SELECT
@@ -142,15 +138,14 @@ def get_monthly_aggregates(months: int) -> List[Dict[str, Any]]:
         """
     else:
         # Direct table query (fallback if views don't exist)
-        # Works with email_raw_slice_001 table structure
+        # Uses materialized thread_state table
         query = f"""
         WITH thread_summary AS (
           SELECT
             thread_id,
-            MAX(thread_last_message_at) AS last_message_ts
-          FROM {_get_table_name(EMAIL_RAW_TABLE)}
+            last_message_ts
+          FROM {_get_table_name(THREAD_STATE_TABLE)}
           WHERE thread_id IS NOT NULL
-          GROUP BY thread_id
         ),
         latest_sentiment AS (
           SELECT
