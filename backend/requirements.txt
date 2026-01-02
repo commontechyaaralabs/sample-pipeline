@@ -1,0 +1,11 @@
+# FastAPI and server dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+
+# Google Cloud BigQuery (uses Application Default Credentials)
+google-cloud-bigquery==3.25.0
+
+# Optional: For better async support
+python-multipart==0.0.12
+
