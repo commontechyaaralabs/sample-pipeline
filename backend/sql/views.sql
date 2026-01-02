@@ -1,11 +1,11 @@
 -- BigQuery Views for Thread Analytics
 -- Run these in BigQuery to create the views that the backend will query
 -- Replace PROJECT_ID, DATASET_ID, and TABLE_NAME with your actual values
--- Example: clariversev1.flipkart_slice.email_raw_slice_001
+-- Example: clariversev1.flipkart_slices.interaction_event
 
 -- View: v_thread_list
 -- Purpose: Thread list with latest sentiment per thread
--- Source: email_raw_slice_001 (one row per message, grouped by thread_id)
+-- Source: interaction_event (one row per message, grouped by thread_id)
 CREATE OR REPLACE VIEW `PROJECT_ID.DATASET_ID.v_thread_list` AS
 WITH thread_summary AS (
   SELECT
@@ -14,7 +14,7 @@ WITH thread_summary AS (
     MAX(thread_message_count) AS message_count,
     -- Derive thread_status: if last message is recent (within 7 days), consider open
     CASE 
-      WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', MAX(thread_last_message_at)), DAY) <= 7 
+      WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(thread_last_message_at), DAY) <= 7 
       THEN 'open'
       ELSE 'closed'
     END AS thread_status
@@ -56,7 +56,7 @@ ORDER BY t.last_message_ts DESC;
 
 -- View: v_monthly_thread_aggregates
 -- Purpose: Monthly aggregates with sentiment distribution
--- Source: email_raw_slice_001 (one row per message, grouped by thread_id)
+-- Source: interaction_event (one row per message, grouped by thread_id)
 CREATE OR REPLACE VIEW `PROJECT_ID.DATASET_ID.v_monthly_thread_aggregates` AS
 WITH thread_summary AS (
   SELECT
@@ -75,7 +75,7 @@ latest_sentiment AS (
   GROUP BY thread_id
 )
 SELECT
-  FORMAT_TIMESTAMP('%Y-%m', PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', t.last_message_ts)) AS month,
+  FORMAT_TIMESTAMP('%Y-%m', t.last_message_ts) AS month,
   COUNT(*) AS thread_count,
   COUNTIF(s.sentiment = 'pos') AS pos_threads,
   COUNTIF(s.sentiment = 'neutral') AS neutral_threads,

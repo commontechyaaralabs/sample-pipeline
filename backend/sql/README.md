@@ -2,12 +2,12 @@
 
 ## Table Structure
 
-Your actual table: `clariversev1.flipkart_slice.email_raw_slice_001`
+Your actual table: `clariversev1.flipkart_slices.interaction_event`
 
 This table has:
 - One row per **message** (not per thread)
 - Key fields: `thread_id`, `thread_last_message_at`, `thread_message_count`
-- String timestamps (format: `YYYY-MM-DD HH:MM:SS`)
+- Timestamp fields are **TIMESTAMP** type (not strings)
 
 ## Creating Views
 
@@ -15,8 +15,8 @@ This table has:
 
 Edit `views.sql` and replace:
 - `PROJECT_ID` → `clariversev1`
-- `DATASET_ID` → `flipkart_slice`
-- `TABLE_NAME` → `email_raw_slice_001`
+- `DATASET_ID` → `flipkart_slices`
+- `TABLE_NAME` → `interaction_event`
 
 ### Step 2: Check for sentiment table
 
@@ -36,7 +36,7 @@ In BigQuery console, run the updated SQL from `views.sql`:
 
 ```sql
 -- View: v_thread_list
-CREATE OR REPLACE VIEW `clariversev1.flipkart_slice.v_thread_list` AS
+CREATE OR REPLACE VIEW `clariversev1.flipkart_slices.v_thread_list` AS
 -- ... (copy from views.sql with replacements)
 ```
 
@@ -46,8 +46,8 @@ Set these in your backend `.env` or Cloud Run:
 
 ```env
 GCP_PROJECT_ID=clariversev1
-BIGQUERY_DATASET_ID=flipkart_slice
-BIGQUERY_EMAIL_RAW_TABLE=email_raw_slice_001
+BIGQUERY_DATASET_ID=flipkart_slices
+BIGQUERY_EMAIL_RAW_TABLE=interaction_event
 BIGQUERY_MESSAGE_SENTIMENT_TABLE=message_sentiment
 BIGQUERY_USE_VIEWS=true
 ```
@@ -56,13 +56,9 @@ BIGQUERY_USE_VIEWS=true
 
 1. **Thread Status**: Derived from `thread_last_message_at` - threads with activity within 7 days are "open", others are "closed"
 
-2. **Timestamp Parsing**: The table stores timestamps as strings, so we use `PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', ...)` to convert them
+2. **Timestamp Fields**: The table uses TIMESTAMP type directly, so no parsing is needed
 
-3. **Sentiment Defaults**: If a thread has no sentiment data, it defaults to:
-   - `sentiment`: 'neutral'
-   - `confidence`: 0.5
-   - `prompt_version`: 'v0.1'
-   - `model_name`: 'unknown'
+3. **Sentiment Data**: If a thread has no sentiment data, those fields will be NULL (no defaults applied)
 
 4. **Grouping**: Since the table has one row per message, we group by `thread_id` and use `MAX()` to get thread-level aggregates
 

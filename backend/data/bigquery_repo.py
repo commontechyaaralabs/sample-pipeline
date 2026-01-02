@@ -25,13 +25,13 @@ client = bigquery.Client()
 
 # These should be set via environment variables at deployment time
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "clariversev1")
-DATASET_ID = os.getenv("BIGQUERY_DATASET_ID", "flipkart_slice")
+DATASET_ID = os.getenv("BIGQUERY_DATASET_ID", "flipkart_slices")
 THREAD_LIST_VIEW = os.getenv("BIGQUERY_THREAD_LIST_VIEW", "v_thread_list")
 MONTHLY_AGGREGATES_VIEW = os.getenv("BIGQUERY_MONTHLY_AGGREGATES_VIEW", "v_monthly_thread_aggregates")
 
 # Table names (fallback if views don't exist)
-# Default to the actual table: clariversev1.flipkart_slice.email_raw_slice_001
-EMAIL_RAW_TABLE = os.getenv("BIGQUERY_EMAIL_RAW_TABLE", "email_raw_slice_001")
+# Default to the actual table: clariversev1.flipkart_slices.interaction_event
+EMAIL_RAW_TABLE = os.getenv("BIGQUERY_EMAIL_RAW_TABLE", "interaction_event")
 MESSAGE_SENTIMENT_TABLE = os.getenv("BIGQUERY_MESSAGE_SENTIMENT_TABLE", "message_sentiment")
 
 # Whether to use views (preferred) or direct table queries
@@ -69,7 +69,7 @@ def get_threads(limit: int) -> List[Dict[str, Any]]:
             MAX(thread_last_message_at) AS last_message_ts,
             MAX(thread_message_count) AS message_count,
             CASE 
-              WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', MAX(thread_last_message_at)), DAY) <= 7 
+              WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(thread_last_message_at), DAY) <= 7 
               THEN 'open'
               ELSE 'closed'
             END AS thread_status
@@ -161,7 +161,7 @@ def get_monthly_aggregates(months: int) -> List[Dict[str, Any]]:
           GROUP BY thread_id
         )
         SELECT
-          FORMAT_TIMESTAMP('%Y-%m', PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', t.last_message_ts)) AS month,
+          FORMAT_TIMESTAMP('%Y-%m', t.last_message_ts) AS month,
           COUNT(*) AS thread_count,
           COUNTIF(s.sentiment = 'pos') AS pos_threads,
           COUNTIF(s.sentiment = 'neutral') AS neutral_threads,
