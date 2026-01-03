@@ -189,10 +189,7 @@ def main():
         message_id = item["message_id"]
         body_text = item.get("body_text") or ""
 
-        # Avoid huge prompts: trim for thin slice (adjust later)
-        body_text_trimmed = body_text[:8000]
-
-        sentiment, confidence = call_gemini_sentiment(model, body_text_trimmed)
+        sentiment, confidence = call_gemini_sentiment(model, body_text)
 
         out_rows.append({
             "message_id": message_id,

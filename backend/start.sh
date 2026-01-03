@@ -13,6 +13,6 @@ echo "Note: Ensure you have authenticated with gcloud:"
 echo "  gcloud auth application-default login"
 echo ""
 
-# Run uvicorn
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Run uvicorn (exclude workers directory from reload watch)
+uvicorn main:app --reload --reload-exclude "workers/*" --host 0.0.0.0 --port 8000
 

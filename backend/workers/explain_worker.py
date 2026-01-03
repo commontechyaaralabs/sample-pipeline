@@ -297,13 +297,10 @@ def main(batch_limit: int = None):
         last_message = item.get("last_message_body") or ""
         prev_message = item.get("previous_message_body")
         
-        last_message_trimmed = last_message[:8000] if last_message else ""
-        prev_message_trimmed = prev_message[:8000] if prev_message else None
-        
         result = explain_thread_state(
             heuristic_status=heuristic_status,
-            last_message=last_message_trimmed,
-            prev_message=prev_message_trimmed
+            last_message=last_message,
+            prev_message=prev_message
         )
         
         out_rows.append({
