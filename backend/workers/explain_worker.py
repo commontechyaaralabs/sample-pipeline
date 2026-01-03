@@ -3,6 +3,11 @@ import re
 import time
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+import os
+import sys
+>>>>>>> Stashed changes
 =======
 import os
 import sys
@@ -29,7 +34,12 @@ MODEL_NAME = "gemini-2.0-flash"
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 BATCH_LIMIT = 50  # number of threads to explain per run
+=======
+# Configurable batch limit - can be set via environment variable or command line arg
+BATCH_LIMIT = int(os.getenv("EXPLAIN_BATCH_LIMIT", "50"))
+>>>>>>> Stashed changes
 =======
 # Configurable batch limit - can be set via environment variable or command line arg
 BATCH_LIMIT = int(os.getenv("EXPLAIN_BATCH_LIMIT", "50"))
@@ -236,7 +246,10 @@ Respond with ONLY the JSON object, no markdown backticks, no explanation."""
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 def fetch_threads_to_explain(bq: bigquery.Client, limit: int = BATCH_LIMIT) -> List[Dict[str, Any]]:
@@ -302,6 +315,9 @@ def fetch_threads_to_explain(bq: bigquery.Client, limit: int = BATCH_LIMIT) -> L
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -311,6 +327,7 @@ def ensure_thread_state_explain_table(bq: bigquery.Client) -> None:
     
     try:
         bq.get_table(table_id)
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
         print(f"Table {table_id} already exists.")
@@ -336,6 +353,8 @@ def insert_explanations(bq: bigquery.Client, rows: List[Dict[str, Any]]) -> None
     table_id = f"{PROJECT_ID}.{DATASET}.thread_state_explain"
     errors = bq.insert_rows_json(table_id, rows)  # streaming insert
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
     except Exception:
@@ -370,6 +389,9 @@ def insert_thread_state_explain(bq: bigquery.Client, rows: List[Dict[str, Any]])
     table_id = f"{PROJECT_ID}.{DATASET}.thread_state_explain"
     errors = bq.insert_rows_json(table_id, rows)
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -377,6 +399,7 @@ def insert_thread_state_explain(bq: bigquery.Client, rows: List[Dict[str, Any]])
         raise RuntimeError(f"BigQuery insert errors: {errors}")
 
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 def main():
@@ -398,6 +421,8 @@ def main():
     now_ts = datetime.now(timezone.utc).isoformat()
 
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 def main(batch_limit: int = None):
@@ -424,6 +449,9 @@ def main(batch_limit: int = None):
     now_ts = datetime.now(timezone.utc)
     
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -432,6 +460,7 @@ def main(batch_limit: int = None):
         heuristic_status = item.get("thread_status") or "open"
         last_message = item.get("last_message_body") or ""
         prev_message = item.get("previous_message_body")
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 
@@ -444,12 +473,17 @@ def main(batch_limit: int = None):
 =======
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
         
         last_message_trimmed = last_message[:8000] if last_message else ""
         prev_message_trimmed = prev_message[:8000] if prev_message else None
         
         result = explain_thread_state(
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -459,7 +493,11 @@ def main(batch_limit: int = None):
         )
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
 =======
         
 >>>>>>> Stashed changes
@@ -476,6 +514,7 @@ def main(batch_limit: int = None):
             "model_name": MODEL_NAME,
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
             "created_at": now_ts,
         })
 
@@ -489,6 +528,8 @@ def main(batch_limit: int = None):
 if __name__ == "__main__":
     main()
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
             "created_at": now_ts.isoformat(),
@@ -513,7 +554,11 @@ if __name__ == "__main__":
     
     main(batch_limit=batch_limit)
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+
 
