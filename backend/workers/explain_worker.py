@@ -1,7 +1,12 @@
 import json
 import re
 import time
-from typing import Dict, Any
+import os
+import sys
+from datetime import datetime, timezone
+from typing import Dict, Any, List
+
+from google.cloud import bigquery
 
 # Vertex AI (Gemini)
 import vertexai
@@ -14,69 +19,21 @@ REGION = "us-central1"
 PROMPT_VERSION = "thread_state_v0.1"
 MODEL_NAME = "gemini-2.0-flash"
 
+# Configurable batch limit - can be set via environment variable or command line arg
+BATCH_LIMIT = int(os.getenv("EXPLAIN_BATCH_LIMIT", "50"))
 MAX_RETRIES = 3
 
+# Lazy initialization
+_model = None
 
-def fetch_threads_to_explain(bq: bigquery.Client) -> List[Dict[str, Any]]:
-    """Fetch threads that need explanation (not yet explained with current prompt version)."""
-    query = f"""
-    WITH thread_statuses AS (
-      SELECT
-        thread_id,
-        thread_status
-      FROM `{PROJECT_ID}.{DATASET}.thread_state`
-      WHERE thread_id IS NOT NULL
-    ),
-    recent_messages AS (
-      SELECT
-        ie.thread_id,
-        ts.thread_status,
-        ARRAY_AGG(
-          STRUCT(
-            ie.body_text AS message_body,
-            ie.event_ts
-          )
-          ORDER BY ie.event_ts DESC
-          LIMIT 2
-        ) AS messages
-      FROM thread_statuses ts
-      INNER JOIN `{PROJECT_ID}.{DATASET}.interaction_event` ie
-        ON ts.thread_id = ie.thread_id
-      WHERE ie.thread_id IS NOT NULL
-      GROUP BY ie.thread_id, ts.thread_status
-    ),
-    threads_with_messages AS (
-      SELECT
-        thread_id,
-        thread_status,
-        messages[OFFSET(0)].message_body AS last_message_body,
-        CASE 
-          WHEN ARRAY_LENGTH(messages) > 1 THEN messages[OFFSET(1)].message_body
-          ELSE NULL
-        END AS previous_message_body
-      FROM recent_messages
-    )
-    SELECT
-      twm.thread_id,
-      twm.thread_status,
-      twm.last_message_body,
-      twm.previous_message_body
-    FROM threads_with_messages twm
-    LEFT JOIN `{PROJECT_ID}.{DATASET}.thread_state_explain` tse
-      ON tse.thread_id = twm.thread_id
-     AND tse.prompt_version = @prompt_version
-    WHERE tse.thread_id IS NULL
-    ORDER BY twm.thread_id
-    LIMIT @limit
-    """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("prompt_version", "STRING", PROMPT_VERSION),
-            bigquery.ScalarQueryParameter("limit", "INT64", BATCH_LIMIT),
-        ]
-    )
-    rows = bq.query(query, job_config=job_config).result()
-    return [dict(r) for r in rows]
+
+def _get_model() -> GenerativeModel:
+    """Get or initialize the Gemini model."""
+    global _model
+    if _model is None:
+        vertexai.init(project=PROJECT_ID, location=REGION)
+        _model = GenerativeModel(MODEL_NAME)
+    return _model
 
 
 def extract_json_from_response(text: str) -> dict:
@@ -99,7 +56,6 @@ def extract_json_from_response(text: str) -> dict:
 
 
 def explain_thread_state(
-    model: GenerativeModel,
     heuristic_status: str,
     last_message: str,
     prev_message: str = None
@@ -108,7 +64,6 @@ def explain_thread_state(
     Explain thread state using LLM.
     
     Args:
-        model: GenerativeModel instance
         heuristic_status: Current heuristic thread status (e.g., "open" or "closed")
         last_message: Body text of the last message
         prev_message: Body text of the previous message (optional)
@@ -120,6 +75,7 @@ def explain_thread_state(
         - status_reason: String (max 2 sentences)
         - confidence: Float between 0.0 and 1.0
     """
+    model = _get_model()
     prev_message_text = prev_message if prev_message else "N/A"
     
     prompt = f"""You are analyzing an email thread to determine its status and next action owner.
@@ -202,20 +158,180 @@ Respond with ONLY the JSON object, no markdown backticks, no explanation."""
         except Exception as e:
             last_err = e
             if attempt < MAX_RETRIES:
-                print(f"Attempt {attempt} failed: {e}. Retrying...")
                 time.sleep(1.5 * attempt)
             else:
-                print(f"Final error - Response was: {resp.text if 'resp' in locals() else 'No response'}")
+                pass
     
     raise RuntimeError(f"Gemini call failed after retries: {last_err}")
 
 
-if __name__ == "__main__":
-    # Simple test
-    result = explain_thread_state(
-        heuristic_status="open",
-        last_message="When will my order be delivered?",
-        prev_message="I placed an order yesterday."
+def fetch_threads_to_explain(bq: bigquery.Client, limit: int = BATCH_LIMIT) -> List[Dict[str, Any]]:
+    """Fetch threads that need explanation from BigQuery."""
+    query = f"""
+    WITH thread_statuses AS (
+      SELECT
+        thread_id,
+        thread_status
+      FROM `{PROJECT_ID}.{DATASET}.thread_state`
+      WHERE thread_id IS NOT NULL
+    ),
+    recent_messages AS (
+      SELECT
+        ie.thread_id,
+        ts.thread_status,
+        ARRAY_AGG(
+          STRUCT(
+            ie.body_text AS message_body,
+            ie.event_ts
+          )
+          ORDER BY ie.event_ts DESC
+          LIMIT 2
+        ) AS messages
+      FROM thread_statuses ts
+      INNER JOIN `{PROJECT_ID}.{DATASET}.interaction_event` ie
+        ON ts.thread_id = ie.thread_id
+      WHERE ie.thread_id IS NOT NULL
+      GROUP BY ie.thread_id, ts.thread_status
+    ),
+    threads_with_messages AS (
+      SELECT
+        thread_id,
+        thread_status,
+        messages[OFFSET(0)].message_body AS last_message_body,
+        CASE 
+          WHEN ARRAY_LENGTH(messages) > 1 THEN messages[OFFSET(1)].message_body
+          ELSE NULL
+        END AS previous_message_body
+      FROM recent_messages
     )
-    print(json.dumps(result, indent=2))
+    SELECT
+      t.thread_id,
+      t.thread_status,
+      t.last_message_body,
+      t.previous_message_body
+    FROM threads_with_messages t
+    LEFT JOIN `{PROJECT_ID}.{DATASET}.thread_state_explain` te
+      ON t.thread_id = te.thread_id
+     AND te.prompt_version = @prompt_version
+    WHERE te.thread_id IS NULL
+    ORDER BY t.thread_id
+    LIMIT @limit
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("prompt_version", "STRING", PROMPT_VERSION),
+            bigquery.ScalarQueryParameter("limit", "INT64", limit),
+        ]
+    )
+    rows = bq.query(query, job_config=job_config).result()
+    return [dict(r) for r in rows]
 
+
+def ensure_thread_state_explain_table(bq: bigquery.Client) -> None:
+    """Create the thread_state_explain table if it doesn't exist."""
+    table_id = f"{PROJECT_ID}.{DATASET}.thread_state_explain"
+    
+    try:
+        bq.get_table(table_id)
+    except Exception:
+        schema = [
+            bigquery.SchemaField("thread_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("thread_status", "STRING"),
+            bigquery.SchemaField("next_action_owner", "STRING"),
+            bigquery.SchemaField("status_reason", "STRING"),
+            bigquery.SchemaField("confidence", "FLOAT64"),
+            bigquery.SchemaField("prompt_version", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("model_name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+        ]
+        table_ref = bigquery.Table(table_id, schema=schema)
+        bq.create_table(table_ref)
+
+
+def insert_thread_state_explain(bq: bigquery.Client, rows: List[Dict[str, Any]]) -> None:
+    """
+    Insert thread state explanation results into BigQuery table thread_state_explain.
+    
+    Each row must include:
+    - thread_id
+    - thread_status
+    - next_action_owner
+    - status_reason
+    - confidence
+    - prompt_version
+    - model_name
+    - created_at (UTC timestamp as ISO string)
+    """
+    table_id = f"{PROJECT_ID}.{DATASET}.thread_state_explain"
+    errors = bq.insert_rows_json(table_id, rows)
+    if errors:
+        raise RuntimeError(f"BigQuery insert errors: {errors}")
+
+
+def main(batch_limit: int = None):
+    """
+    Main function to process thread state explanations.
+    
+    Args:
+        batch_limit: Number of threads to process (defaults to BATCH_LIMIT)
+    """
+    if batch_limit is None:
+        batch_limit = BATCH_LIMIT
+    
+    bq = bigquery.Client(project=PROJECT_ID)
+    
+    ensure_thread_state_explain_table(bq)
+    
+    vertexai.init(project=PROJECT_ID, location=REGION)
+    
+    to_explain = fetch_threads_to_explain(bq, batch_limit)
+    if not to_explain:
+        return
+    
+    out_rows = []
+    now_ts = datetime.now(timezone.utc)
+    
+    for i, item in enumerate(to_explain, start=1):
+        thread_id = item["thread_id"]
+        heuristic_status = item.get("thread_status") or "open"
+        last_message = item.get("last_message_body") or ""
+        prev_message = item.get("previous_message_body")
+        
+        last_message_trimmed = last_message[:8000] if last_message else ""
+        prev_message_trimmed = prev_message[:8000] if prev_message else None
+        
+        result = explain_thread_state(
+            heuristic_status=heuristic_status,
+            last_message=last_message_trimmed,
+            prev_message=prev_message_trimmed
+        )
+        
+        out_rows.append({
+            "thread_id": thread_id,
+            "thread_status": result["thread_status"],
+            "next_action_owner": result["next_action_owner"],
+            "status_reason": result["status_reason"],
+            "confidence": result["confidence"],
+            "prompt_version": PROMPT_VERSION,
+            "model_name": MODEL_NAME,
+            "created_at": now_ts.isoformat(),
+        })
+        
+        if i % 10 == 0:
+            print(f"Processed {i}/{len(to_explain)} threads...")
+    
+    if out_rows:
+        insert_thread_state_explain(bq, out_rows)
+        print(f"Inserted {len(out_rows)} explanation rows into thread_state_explain.")
+
+
+if __name__ == "__main__":
+    # Allow batch limit to be set via command line argument
+    batch_limit = None
+    if len(sys.argv) > 1:
+        try:
+            batch_limit = int(sys.argv[1])
+        except ValueError:
+            print(f"Invalid batch limit: {sys.argv[1]}. Using default: {BATCH_LIMIT}")
+    
+    main(batch_limit=batch_limit)
