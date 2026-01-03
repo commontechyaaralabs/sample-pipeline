@@ -6,6 +6,9 @@ pydantic==2.9.2
 # Google Cloud BigQuery (uses Application Default Credentials)
 google-cloud-bigquery==3.25.0
 
+# Vertex AI (Gemini) for LLM workers
+google-cloud-aiplatform>=1.25.0
+
 # Optional: For better async support
 python-multipart==0.0.12
 
