@@ -45,7 +45,11 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
     );
   }
 
-  const getSentimentBadge = (sentiment: string) => {
+  const getSentimentBadge = (sentiment: string | null | undefined) => {
+    if (!sentiment) {
+      return <span className="text-zinc-400 dark:text-zinc-500">—</span>;
+    }
+    
     const sentimentConfig: Record<string, { color: string; label: string }> = {
       'Happy': { color: 'bg-green-500 text-white', label: 'Happy' },
       'Bit Irritated': { color: 'bg-yellow-500 text-white', label: 'Bit Irritated' },
@@ -148,10 +152,10 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
                 Next Action
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Sentiment
+                Why?
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Confidence
+                Sentiment
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                 Last Updated
@@ -172,37 +176,27 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
                   {thread.thread_id}
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(thread.thread_status, thread.status_source)}
-                    {thread.status_reason && (
-                      <span
-                        title={thread.status_reason}
-                        className="cursor-help text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                      >
-                        Why?
-                      </span>
-                    )}
-                  </div>
+                  {getStatusBadge(thread.thread_status, thread.status_source)}
                 </td>
                 <td className="px-4 py-3 text-sm">
                   {getNextActionBadge(thread.next_action_owner)}
                 </td>
+                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+                  {thread.status_reason ? (
+                    <span
+                      title={thread.status_reason}
+                      className="cursor-help text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-dotted"
+                    >
+                      {thread.status_reason}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-400 dark:text-zinc-500">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-sm">
                   {getSentimentBadge(thread.sentiment)}
                 </td>
-                <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                  <span
-                    title={`Confidence: ${(thread.confidence * 100).toFixed(1)}% | Model: ${thread.model_name} | Prompt: ${thread.prompt_version}`}
-                    className="cursor-help underline decoration-dotted"
-                  >
-                    {(thread.confidence * 100).toFixed(0)}%
-                  </span>
-                  {thread.status_confidence !== undefined && (
-                    <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
-                      (Status: {(thread.status_confidence * 100).toFixed(0)}%)
-                    </span>
-                  )}
-                </td>
+
                 <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
                   {formatDate(thread.last_message_ts)}
                 </td>
