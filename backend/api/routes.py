@@ -6,15 +6,9 @@ All data access is delegated to the repository layer.
 """
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
-import os
 
-# Import repository functions based on environment
-USE_MOCK = os.getenv("USE_MOCK_DATA", "true").lower() == "true"
-
-if USE_MOCK:
-    from data.mock_repo import get_threads, get_monthly_aggregates
-else:
-    from data.bigquery_repo import get_threads, get_monthly_aggregates
+# Import BigQuery repository functions
+from data.bigquery_repo import get_threads, get_monthly_aggregates
 
 router = APIRouter()
 

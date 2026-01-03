@@ -16,16 +16,22 @@ from typing import List, Dict, Any
 from google.cloud import bigquery
 import os
 
+# These should be set via environment variables at deployment time
+PROJECT_ID = os.getenv("GCP_PROJECT_ID", "clariversev1")
+DATASET_ID = os.getenv("BIGQUERY_DATASET_ID", "flipkart_slices")
+
 # Initialize BigQuery client using Application Default Credentials
 # This will automatically use:
 # 1. Service account attached to Cloud Run/GKE/GCE
 # 2. User credentials from gcloud CLI (local dev)
 # 3. Environment variable GOOGLE_APPLICATION_CREDENTIALS (if set, but we don't use this)
-client = bigquery.Client()
-
-# These should be set via environment variables at deployment time
-PROJECT_ID = os.getenv("GCP_PROJECT_ID", "clariversev1")
-DATASET_ID = os.getenv("BIGQUERY_DATASET_ID", "flipkart_slices")
+# Pass project ID to avoid initialization errors
+try:
+    client = bigquery.Client(project=PROJECT_ID)
+except Exception as e:
+    print(f"WARNING: Failed to initialize BigQuery client: {e}")
+    print(f"Make sure you have authenticated: gcloud auth application-default login")
+    client = None  # Will fail on first query, but at least server starts
 THREAD_LIST_VIEW = os.getenv("BIGQUERY_THREAD_LIST_VIEW", "v_thread_list")
 MONTHLY_AGGREGATES_VIEW = os.getenv("BIGQUERY_MONTHLY_AGGREGATES_VIEW", "v_monthly_thread_aggregates")
 
@@ -50,7 +56,7 @@ def get_threads(limit: int) -> List[Dict[str, Any]]:
     
     Uses views if available, otherwise queries tables directly.
     Uses parameterized queries to prevent SQL injection.
-    Returns data matching the mock repository structure.
+    Returns thread data with sentiment information.
     """
     if USE_VIEWS:
         # Use view (preferred - faster and cleaner)
@@ -113,11 +119,22 @@ def get_threads(limit: int) -> List[Dict[str, Any]]:
         ]
     )
     
-    job = client.query(query, job_config=job_config)
-    results = job.result()
-    
-    # Convert BigQuery Row objects to dictionaries
-    return [dict(row) for row in results]
+    try:
+        job = client.query(query, job_config=job_config)
+        results = job.result()
+        
+        # Convert BigQuery Row objects to dictionaries
+        return [dict(row) for row in results]
+    except Exception as e:
+        # Log detailed error for debugging
+        error_msg = str(e)
+        print(f"ERROR in get_threads:")
+        print(f"  Project: {PROJECT_ID}, Dataset: {DATASET_ID}")
+        print(f"  Using views: {USE_VIEWS}")
+        print(f"  Error: {error_msg}")
+        if "Not found" in error_msg or "does not exist" in error_msg:
+            raise Exception(f"Table or view not found. Backend team needs to create: {THREAD_STATE_TABLE if not USE_VIEWS else THREAD_LIST_VIEW}")
+        raise Exception(f"BigQuery error: {error_msg}")
 
 
 def get_monthly_aggregates(months: int) -> List[Dict[str, Any]]:
@@ -126,7 +143,7 @@ def get_monthly_aggregates(months: int) -> List[Dict[str, Any]]:
     
     Uses views if available, otherwise queries tables directly.
     Uses parameterized queries to prevent SQL injection.
-    Returns data matching the mock repository structure.
+    Returns monthly thread aggregates with sentiment distribution.
     """
     if USE_VIEWS:
         # Use view (preferred - faster and cleaner)
@@ -175,9 +192,26 @@ def get_monthly_aggregates(months: int) -> List[Dict[str, Any]]:
         ]
     )
     
-    job = client.query(query, job_config=job_config)
-    results = job.result()
+    if client is None:
+        raise Exception("BigQuery client not initialized. Run: gcloud auth application-default login")
     
-    # Convert BigQuery Row objects to dictionaries
-    return [dict(row) for row in results]
+    try:
+        job = client.query(query, job_config=job_config)
+        results = job.result()
+        
+        # Convert BigQuery Row objects to dictionaries
+        return [dict(row) for row in results]
+    except Exception as e:
+        # Log detailed error for debugging
+        error_msg = str(e)
+        print(f"ERROR in get_monthly_aggregates:")
+        print(f"  Project: {PROJECT_ID}, Dataset: {DATASET_ID}")
+        print(f"  Using views: {USE_VIEWS}")
+        print(f"  Error: {error_msg}")
+        if "Not found" in error_msg or "does not exist" in error_msg or "404" in error_msg:
+            missing = MONTHLY_AGGREGATES_VIEW if USE_VIEWS else THREAD_STATE_TABLE
+            raise Exception(f"Table/view not found: {PROJECT_ID}.{DATASET_ID}.{missing}. Backend team needs to create this.")
+        if "403" in error_msg or "permission" in error_msg.lower():
+            raise Exception(f"Permission denied. Check BigQuery access for project {PROJECT_ID}")
+        raise Exception(f"BigQuery error: {error_msg}")
 

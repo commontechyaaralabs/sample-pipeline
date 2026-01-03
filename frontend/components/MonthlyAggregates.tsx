@@ -61,21 +61,29 @@ export default function MonthlyAggregates({ months = 12 }: MonthlyAggregatesProp
                 Total Threads
               </th>
               <th className="px-4 py-3 text-right text-sm font-semibold text-green-700 dark:text-green-400">
-                Positive
+                Happy
               </th>
-              <th className="px-4 py-3 text-right text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-                Neutral
+              <th className="px-4 py-3 text-right text-sm font-semibold text-yellow-700 dark:text-yellow-400">
+                Bit Irritated
+              </th>
+              <th className="px-4 py-3 text-right text-sm font-semibold text-orange-700 dark:text-orange-400">
+                Moderately Concerned
               </th>
               <th className="px-4 py-3 text-right text-sm font-semibold text-red-700 dark:text-red-400">
-                Negative
+                Anger
+              </th>
+              <th className="px-4 py-3 text-right text-sm font-semibold text-red-900 dark:text-red-500">
+                Frustrated
               </th>
             </tr>
           </thead>
           <tbody>
             {aggregates.map((agg) => {
-              const posPercent = (agg.pos_threads / agg.thread_count) * 100;
-              const neutralPercent = (agg.neutral_threads / agg.thread_count) * 100;
-              const negPercent = (agg.neg_threads / agg.thread_count) * 100;
+              const happyPercent = (agg.happy_threads / agg.thread_count) * 100;
+              const bitIrritatedPercent = (agg.bit_irritated_threads / agg.thread_count) * 100;
+              const moderatelyConcernedPercent = (agg.moderately_concerned_threads / agg.thread_count) * 100;
+              const angerPercent = (agg.anger_threads / agg.thread_count) * 100;
+              const frustratedPercent = (agg.frustrated_threads / agg.thread_count) * 100;
 
               return (
                 <tr
@@ -89,13 +97,19 @@ export default function MonthlyAggregates({ months = 12 }: MonthlyAggregatesProp
                     {agg.thread_count.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-right text-sm text-green-700 dark:text-green-400">
-                    {agg.pos_threads.toLocaleString()} ({posPercent.toFixed(1)}%)
+                    {agg.happy_threads.toLocaleString()} ({happyPercent.toFixed(1)}%)
                   </td>
-                  <td className="px-4 py-3 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                    {agg.neutral_threads.toLocaleString()} ({neutralPercent.toFixed(1)}%)
+                  <td className="px-4 py-3 text-right text-sm text-yellow-700 dark:text-yellow-400">
+                    {agg.bit_irritated_threads.toLocaleString()} ({bitIrritatedPercent.toFixed(1)}%)
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm text-orange-700 dark:text-orange-400">
+                    {agg.moderately_concerned_threads.toLocaleString()} ({moderatelyConcernedPercent.toFixed(1)}%)
                   </td>
                   <td className="px-4 py-3 text-right text-sm text-red-700 dark:text-red-400">
-                    {agg.neg_threads.toLocaleString()} ({negPercent.toFixed(1)}%)
+                    {agg.anger_threads.toLocaleString()} ({angerPercent.toFixed(1)}%)
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm text-red-900 dark:text-red-500">
+                    {agg.frustrated_threads.toLocaleString()} ({frustratedPercent.toFixed(1)}%)
                   </td>
                 </tr>
               );

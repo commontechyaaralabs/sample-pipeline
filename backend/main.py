@@ -4,8 +4,7 @@ FastAPI application entry point.
 Enterprise-compliant setup:
 - No credentials in code
 - Uses Application Default Credentials for BigQuery
-- Mock mode for local development (USE_MOCK_DATA=true)
-- Production mode uses BigQuery via ADC
+- Always uses BigQuery (no mock mode)
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,10 +39,9 @@ app.include_router(router, prefix="/api", tags=["threads"])
 @app.get("/")
 async def root():
     """Health check endpoint."""
-    use_mock = os.getenv("USE_MOCK_DATA", "true").lower() == "true"
     return {
         "status": "healthy",
-        "data_source": "mock" if use_mock else "bigquery",
+        "data_source": "bigquery",
         "message": "Thread Analytics API"
     }
 
@@ -51,10 +49,9 @@ async def root():
 @app.get("/health")
 async def health():
     """Detailed health check."""
-    use_mock = os.getenv("USE_MOCK_DATA", "true").lower() == "true"
     return {
         "status": "healthy",
-        "data_source": "mock" if use_mock else "bigquery",
+        "data_source": "bigquery",
         "endpoints": {
             "threads": "/api/threads",
             "monthly_aggregates": "/api/threads/aggregates/monthly"

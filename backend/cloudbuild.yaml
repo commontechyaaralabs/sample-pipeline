@@ -33,7 +33,7 @@ steps:
       - '--service-account'
       - 'cloud-run-frontend-sa@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
-      - 'USE_MOCK_DATA=false,GCP_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET_ID=your-dataset,BIGQUERY_THREAD_LIST_VIEW=v_thread_list,BIGQUERY_MONTHLY_AGGREGATES_VIEW=v_monthly_thread_aggregates'
+      - 'GCP_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET_ID=your-dataset,BIGQUERY_THREAD_LIST_VIEW=v_thread_list,BIGQUERY_MONTHLY_AGGREGATES_VIEW=v_monthly_thread_aggregates'
       - '--set-env-vars'
       - 'FRONTEND_URL=https://your-frontend-domain.com'
 

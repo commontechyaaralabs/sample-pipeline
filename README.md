@@ -38,11 +38,11 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run in mock mode (default)
-USE_MOCK_DATA=true uvicorn main:app --reload --port 8000
+# Run server (requires gcloud auth for BigQuery)
+# For local development, authenticate first:
+# gcloud auth application-default login
 
-# Or run in BigQuery mode (requires gcloud auth)
-USE_MOCK_DATA=false uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 8000
 ```
 
 ### Frontend Setup
@@ -159,7 +159,7 @@ Retrieve monthly thread aggregates.
      --source . \
      --region us-central1 \
      --service-account cloud-run-frontend-sa@$PROJECT_ID.iam.gserviceaccount.com \
-     --set-env-vars USE_MOCK_DATA=false,GCP_PROJECT_ID=$PROJECT_ID
+     --set-env-vars GCP_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET_ID=flipkart_slices
    ```
    
    **Windows PowerShell:**
@@ -170,17 +170,19 @@ Retrieve monthly thread aggregates.
      --source . `
      --region us-central1 `
      --service-account cloud-run-frontend-sa@$PROJECT_ID.iam.gserviceaccount.com `
-     --set-env-vars "USE_MOCK_DATA=false,GCP_PROJECT_ID=$PROJECT_ID"
+     --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET_ID=flipkart_slices"
    ```
 
 ### Environment Variables
 
 **Backend (Cloud Run):**
-- `USE_MOCK_DATA`: `false` for production (uses BigQuery)
-- `GCP_PROJECT_ID`: Your GCP project ID
-- `BIGQUERY_DATASET_ID`: Your BigQuery dataset ID
+- `GCP_PROJECT_ID`: Your GCP project ID (default: `clariversev1`)
+- `BIGQUERY_DATASET_ID`: Your BigQuery dataset ID (default: `flipkart_slices`)
+- `BIGQUERY_THREAD_STATE_TABLE`: Table name (default: `thread_state`)
+- `BIGQUERY_MESSAGE_SENTIMENT_TABLE`: Table name (default: `message_sentiment`)
 - `BIGQUERY_THREAD_LIST_VIEW`: View name (default: `v_thread_list`)
 - `BIGQUERY_MONTHLY_AGGREGATES_VIEW`: View name (default: `v_monthly_thread_aggregates`)
+- `BIGQUERY_USE_VIEWS`: Use views instead of direct table queries (default: `true`)
 - `FRONTEND_URL`: Frontend domain for CORS
 
 **Frontend:**
@@ -220,15 +222,16 @@ ORDER BY month DESC
 
 ## Development
 
-### Mock Mode (Default)
-- No GCP setup required
-- Uses `mock_repo.py` for data
-- Perfect for frontend development
-
-### BigQuery Mode
-- Requires `gcloud auth application-default login`
-- Uses `bigquery_repo.py` for data
-- Requires BigQuery views to exist
+### Local Development Setup
+- Requires `gcloud auth application-default login` for BigQuery access
+- Uses `bigquery_repo.py` for data (always uses BigQuery)
+- Requires BigQuery tables and views to exist:
+  - Tables (created by backend team): `thread_state`, `message_sentiment`
+  - Views (we create): `v_thread_list`, `v_monthly_thread_aggregates`
+- For local testing:
+  1. Authenticate: `gcloud auth application-default login`
+  2. Ensure you have access to the BigQuery dataset
+  3. Run: `uvicorn main:app --reload --port 8000`
 
 ## Security Compliance
 

@@ -46,19 +46,23 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
   }
 
   const getSentimentBadge = (sentiment: string) => {
-    const colors = {
-      pos: 'bg-green-500 text-white',
-      neg: 'bg-red-500 text-white',
-      neutral: 'bg-gray-500 text-white',
+    const sentimentConfig: Record<string, { color: string; label: string }> = {
+      'Happy': { color: 'bg-green-500 text-white', label: 'Happy' },
+      'Bit Irritated': { color: 'bg-yellow-500 text-white', label: 'Bit Irritated' },
+      'Moderately Concerned': { color: 'bg-orange-500 text-white', label: 'Moderately Concerned' },
+      'Anger': { color: 'bg-red-500 text-white', label: 'Anger' },
+      'Frustrated': { color: 'bg-red-700 text-white', label: 'Frustrated' },
+      // Backward compatibility
+      'pos': { color: 'bg-green-500 text-white', label: 'Pos' },
+      'neg': { color: 'bg-red-500 text-white', label: 'Neg' },
+      'neutral': { color: 'bg-gray-500 text-white', label: 'Neutral' },
     };
-    const labels = {
-      pos: 'Pos',
-      neg: 'Neg',
-      neutral: 'Neutral',
-    };
+    
+    const config = sentimentConfig[sentiment] || { color: 'bg-gray-500 text-white', label: sentiment };
+    
     return (
-      <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${colors[sentiment as keyof typeof colors] || colors.neutral}`}>
-        {labels[sentiment as keyof typeof labels] || sentiment}
+      <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${config.color}`}>
+        {config.label}
       </span>
     );
   };

@@ -6,12 +6,14 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+export type Sentiment = 'Happy' | 'Bit Irritated' | 'Moderately Concerned' | 'Anger' | 'Frustrated';
+
 export interface Thread {
   thread_id: string;
   last_message_ts: string;
   message_count: number;
   thread_status: 'open' | 'closed';
-  sentiment: 'pos' | 'neg' | 'neutral';
+  sentiment: Sentiment | string;
   confidence: number;
   prompt_version: string;
   model_name: string;
@@ -20,9 +22,11 @@ export interface Thread {
 export interface MonthlyAggregate {
   month: string;
   thread_count: number;
-  pos_threads: number;
-  neutral_threads: number;
-  neg_threads: number;
+  happy_threads: number;
+  bit_irritated_threads: number;
+  moderately_concerned_threads: number;
+  anger_threads: number;
+  frustrated_threads: number;
 }
 
 /**
