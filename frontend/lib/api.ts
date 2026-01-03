@@ -17,6 +17,11 @@ export interface Thread {
   confidence: number;
   prompt_version: string;
   model_name: string;
+  // New fields from v_thread_state_final
+  next_action_owner?: 'org' | 'customer' | 'none';
+  status_reason?: string;
+  status_source?: 'llm' | 'heuristic';
+  status_confidence?: number;
 }
 
 export interface MonthlyAggregate {

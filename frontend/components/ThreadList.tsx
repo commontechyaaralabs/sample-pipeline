@@ -67,17 +67,52 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
     );
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'open') {
+  const getStatusBadge = (status: string, source?: string) => {
+    const statusBadge = status === 'open' ? (
+      <span className="inline-flex items-center rounded border border-blue-500 bg-transparent px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">
+        Open
+      </span>
+    ) : (
+      <span className="inline-flex items-center rounded bg-gray-700 px-2 py-1 text-xs font-medium text-white">
+        Closed
+      </span>
+    );
+
+    if (source) {
+      const sourceBadge = source === 'llm' ? (
+        <span className="ml-1 inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+          LLM
+        </span>
+      ) : (
+        <span className="ml-1 inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+          Heuristic
+        </span>
+      );
       return (
-        <span className="inline-flex items-center rounded border border-blue-500 bg-transparent px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">
-          Open
+        <span className="inline-flex items-center">
+          {statusBadge}
+          {sourceBadge}
         </span>
       );
     }
+
+    return statusBadge;
+  };
+
+  const getNextActionBadge = (owner?: string) => {
+    if (!owner) return <span className="text-zinc-400 dark:text-zinc-500">—</span>;
+    
+    const config: Record<string, { color: string; label: string }> = {
+      'org': { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', label: 'Org' },
+      'customer': { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', label: 'Customer' },
+      'none': { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200', label: 'None' },
+    };
+    
+    const actionConfig = config[owner] || { color: 'bg-gray-100 text-gray-800', label: owner };
+    
     return (
-      <span className="inline-flex items-center rounded bg-gray-700 px-2 py-1 text-xs font-medium text-white">
-        Closed
+      <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${actionConfig.color}`}>
+        {actionConfig.label}
       </span>
     );
   };
@@ -110,6 +145,9 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
                 Status
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                Next Action
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                 Sentiment
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100">
@@ -134,7 +172,20 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
                   {thread.thread_id}
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  {getStatusBadge(thread.thread_status)}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(thread.thread_status, thread.status_source)}
+                    {thread.status_reason && (
+                      <span
+                        title={thread.status_reason}
+                        className="cursor-help text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                      >
+                        Why?
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {getNextActionBadge(thread.next_action_owner)}
                 </td>
                 <td className="px-4 py-3 text-sm">
                   {getSentimentBadge(thread.sentiment)}
@@ -146,6 +197,11 @@ export default function ThreadList({ limit = 200 }: ThreadListProps) {
                   >
                     {(thread.confidence * 100).toFixed(0)}%
                   </span>
+                  {thread.status_confidence !== undefined && (
+                    <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      (Status: {(thread.status_confidence * 100).toFixed(0)}%)
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
                   {formatDate(thread.last_message_ts)}

@@ -16,13 +16,16 @@ router = APIRouter()
 @router.get("/threads")
 async def list_threads(limit: int = 200) -> List[Dict[str, Any]]:
     """
-    Retrieve a list of threads.
+    Retrieve a list of threads from v_thread_state_final view.
     
     Args:
-        limit: Maximum number of threads to return (default: 10)
+        limit: Maximum number of threads to return (default: 200, max: 200)
         
     Returns:
-        List of thread objects
+        List of thread objects with fields:
+        - thread_id, last_message_ts, message_count, thread_status
+        - sentiment, confidence, prompt_version, model_name
+        - next_action_owner, status_reason, status_source, status_confidence (if LLM explanation available)
     """
     try:
         if limit < 1 or limit > 200:

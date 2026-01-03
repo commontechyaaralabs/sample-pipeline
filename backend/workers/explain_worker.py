@@ -1,6 +1,11 @@
 import json
 import re
 import time
+<<<<<<< Updated upstream
+=======
+import os
+import sys
+>>>>>>> Stashed changes
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 
@@ -14,10 +19,15 @@ PROJECT_ID = "clariversev1"
 DATASET = "flipkart_slices"
 REGION = "us-central1"
 
-PROMPT_VERSION = "explain_v0.1"
+PROMPT_VERSION = "thread_state_v0.1"
 MODEL_NAME = "gemini-2.0-flash"
 
+<<<<<<< Updated upstream
 BATCH_LIMIT = 50  # number of threads to explain per run
+=======
+# Configurable batch limit - can be set via environment variable or command line arg
+BATCH_LIMIT = int(os.getenv("EXPLAIN_BATCH_LIMIT", "50"))
+>>>>>>> Stashed changes
 MAX_RETRIES = 3
 
 
@@ -214,12 +224,78 @@ Respond with ONLY the JSON object, no markdown backticks, no explanation."""
     raise RuntimeError(f"Gemini call failed after retries: {last_err}")
 
 
+<<<<<<< Updated upstream
+=======
+def fetch_threads_to_explain(bq: bigquery.Client, limit: int = BATCH_LIMIT) -> List[Dict[str, Any]]:
+    """Fetch threads that need explanation from BigQuery."""
+    query = f"""
+    WITH thread_statuses AS (
+      SELECT
+        thread_id,
+        thread_status
+      FROM `{PROJECT_ID}.{DATASET}.thread_state`
+      WHERE thread_id IS NOT NULL
+    ),
+    recent_messages AS (
+      SELECT
+        ie.thread_id,
+        ts.thread_status,
+        ARRAY_AGG(
+          STRUCT(
+            ie.body_text AS message_body,
+            ie.event_ts
+          )
+          ORDER BY ie.event_ts DESC
+          LIMIT 2
+        ) AS messages
+      FROM thread_statuses ts
+      INNER JOIN `{PROJECT_ID}.{DATASET}.interaction_event` ie
+        ON ts.thread_id = ie.thread_id
+      WHERE ie.thread_id IS NOT NULL
+      GROUP BY ie.thread_id, ts.thread_status
+    ),
+    threads_with_messages AS (
+      SELECT
+        thread_id,
+        thread_status,
+        messages[OFFSET(0)].message_body AS last_message_body,
+        CASE 
+          WHEN ARRAY_LENGTH(messages) > 1 THEN messages[OFFSET(1)].message_body
+          ELSE NULL
+        END AS previous_message_body
+      FROM recent_messages
+    )
+    SELECT
+      t.thread_id,
+      t.thread_status,
+      t.last_message_body,
+      t.previous_message_body
+    FROM threads_with_messages t
+    LEFT JOIN `{PROJECT_ID}.{DATASET}.thread_state_explain` te
+      ON t.thread_id = te.thread_id
+     AND te.prompt_version = @prompt_version
+    WHERE te.thread_id IS NULL
+    ORDER BY t.thread_id
+    LIMIT @limit
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("prompt_version", "STRING", PROMPT_VERSION),
+            bigquery.ScalarQueryParameter("limit", "INT64", limit),
+        ]
+    )
+    rows = bq.query(query, job_config=job_config).result()
+    return [dict(r) for r in rows]
+
+
+>>>>>>> Stashed changes
 def ensure_thread_state_explain_table(bq: bigquery.Client) -> None:
     """Create the thread_state_explain table if it doesn't exist."""
     table_id = f"{PROJECT_ID}.{DATASET}.thread_state_explain"
     
     try:
         bq.get_table(table_id)
+<<<<<<< Updated upstream
         print(f"Table {table_id} already exists.")
     except Exception:
         print(f"Creating table {table_id}...")
@@ -242,10 +318,44 @@ def insert_explanations(bq: bigquery.Client, rows: List[Dict[str, Any]]) -> None
     """Insert explanation results into BigQuery."""
     table_id = f"{PROJECT_ID}.{DATASET}.thread_state_explain"
     errors = bq.insert_rows_json(table_id, rows)  # streaming insert
+=======
+    except Exception:
+        schema = [
+            bigquery.SchemaField("thread_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("thread_status", "STRING"),
+            bigquery.SchemaField("next_action_owner", "STRING"),
+            bigquery.SchemaField("status_reason", "STRING"),
+            bigquery.SchemaField("confidence", "FLOAT64"),
+            bigquery.SchemaField("prompt_version", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("model_name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+        ]
+        table_ref = bigquery.Table(table_id, schema=schema)
+        bq.create_table(table_ref)
+
+
+def insert_thread_state_explain(bq: bigquery.Client, rows: List[Dict[str, Any]]) -> None:
+    """
+    Insert thread state explanation results into BigQuery table thread_state_explain.
+    
+    Each row must include:
+    - thread_id
+    - thread_status
+    - next_action_owner
+    - status_reason
+    - confidence
+    - prompt_version
+    - model_name
+    - created_at (UTC timestamp as ISO string)
+    """
+    table_id = f"{PROJECT_ID}.{DATASET}.thread_state_explain"
+    errors = bq.insert_rows_json(table_id, rows)
+>>>>>>> Stashed changes
     if errors:
         raise RuntimeError(f"BigQuery insert errors: {errors}")
 
 
+<<<<<<< Updated upstream
 def main():
     bq = bigquery.Client(project=PROJECT_ID)
 
@@ -264,11 +374,37 @@ def main():
     out_rows = []
     now_ts = datetime.now(timezone.utc).isoformat()
 
+=======
+def main(batch_limit: int = None):
+    """
+    Main function to process thread state explanations.
+    
+    Args:
+        batch_limit: Number of threads to process (defaults to BATCH_LIMIT)
+    """
+    if batch_limit is None:
+        batch_limit = BATCH_LIMIT
+    
+    bq = bigquery.Client(project=PROJECT_ID)
+    
+    ensure_thread_state_explain_table(bq)
+    
+    vertexai.init(project=PROJECT_ID, location=REGION)
+    
+    to_explain = fetch_threads_to_explain(bq, batch_limit)
+    if not to_explain:
+        return
+    
+    out_rows = []
+    now_ts = datetime.now(timezone.utc)
+    
+>>>>>>> Stashed changes
     for i, item in enumerate(to_explain, start=1):
         thread_id = item["thread_id"]
         heuristic_status = item.get("thread_status") or "open"
         last_message = item.get("last_message_body") or ""
         prev_message = item.get("previous_message_body")
+<<<<<<< Updated upstream
 
         # Avoid huge prompts: trim for thin slice
         last_message_trimmed = last_message[:8000]
@@ -276,11 +412,22 @@ def main():
 
         result = explain_thread_state(
             model=model,
+=======
+        
+        last_message_trimmed = last_message[:8000] if last_message else ""
+        prev_message_trimmed = prev_message[:8000] if prev_message else None
+        
+        result = explain_thread_state(
+>>>>>>> Stashed changes
             heuristic_status=heuristic_status,
             last_message=last_message_trimmed,
             prev_message=prev_message_trimmed
         )
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
         out_rows.append({
             "thread_id": thread_id,
             "thread_status": result["thread_status"],
@@ -289,6 +436,7 @@ def main():
             "confidence": result["confidence"],
             "prompt_version": PROMPT_VERSION,
             "model_name": MODEL_NAME,
+<<<<<<< Updated upstream
             "created_at": now_ts,
         })
 
@@ -301,4 +449,27 @@ def main():
 
 if __name__ == "__main__":
     main()
+=======
+            "created_at": now_ts.isoformat(),
+        })
+        
+        if i % 10 == 0:
+            print(f"Processed {i}/{len(to_explain)} threads...")
+    
+    if out_rows:
+        insert_thread_state_explain(bq, out_rows)
+        print(f"Inserted {len(out_rows)} explanation rows into thread_state_explain.")
+
+
+if __name__ == "__main__":
+    # Allow batch limit to be set via command line argument
+    batch_limit = None
+    if len(sys.argv) > 1:
+        try:
+            batch_limit = int(sys.argv[1])
+        except ValueError:
+            print(f"Invalid batch limit: {sys.argv[1]}. Using default: {BATCH_LIMIT}")
+    
+    main(batch_limit=batch_limit)
+>>>>>>> Stashed changes
 

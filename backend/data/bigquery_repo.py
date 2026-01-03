@@ -32,7 +32,7 @@ except Exception as e:
     print(f"WARNING: Failed to initialize BigQuery client: {e}")
     print(f"Make sure you have authenticated: gcloud auth application-default login")
     client = None  # Will fail on first query, but at least server starts
-THREAD_LIST_VIEW = os.getenv("BIGQUERY_THREAD_LIST_VIEW", "v_thread_list")
+THREAD_LIST_VIEW = os.getenv("BIGQUERY_THREAD_LIST_VIEW", "v_thread_state_final")
 MONTHLY_AGGREGATES_VIEW = os.getenv("BIGQUERY_MONTHLY_AGGREGATES_VIEW", "v_monthly_thread_aggregates")
 
 # Table names (fallback if views don't exist)
@@ -68,7 +68,7 @@ def get_threads(limit: int) -> List[Dict[str, Any]]:
         """
     else:
         # Direct table query (fallback if views don't exist)
-        # Uses materialized thread_state table
+        # Uses materialized thread_state table + thread_state_explain + message_sentiment
         query = f"""
         WITH thread_summary AS (
           SELECT
@@ -96,18 +96,44 @@ def get_threads(limit: int) -> List[Dict[str, Any]]:
           FROM {_get_table_name(MESSAGE_SENTIMENT_TABLE)}
           WHERE thread_id IS NOT NULL
           GROUP BY thread_id
+        ),
+        latest_explain AS (
+          SELECT
+            thread_id,
+            ARRAY_AGG(
+              STRUCT(
+                thread_status AS explain_thread_status,
+                next_action_owner,
+                status_reason,
+                confidence AS status_confidence,
+                prompt_version AS explain_prompt_version,
+                model_name AS explain_model_name,
+                created_at
+              )
+              ORDER BY created_at DESC
+              LIMIT 1
+            )[OFFSET(0)] AS e
+          FROM `{PROJECT_ID}.{DATASET_ID}.thread_state_explain`
+          WHERE thread_id IS NOT NULL
+          GROUP BY thread_id
         )
         SELECT
           t.thread_id,
           t.last_message_ts,
           t.message_count,
-          t.thread_status,
+          COALESCE(e.explain_thread_status, t.thread_status) AS thread_status,
           s.sentiment,
           s.confidence,
           s.prompt_version,
-          s.model_name
+          s.model_name,
+          e.next_action_owner,
+          e.status_reason,
+          CASE WHEN e.thread_id IS NOT NULL THEN 'llm' ELSE 'heuristic' END AS status_source,
+          e.status_confidence
         FROM thread_summary t
         LEFT JOIN latest_sentiment s
+          USING (thread_id)
+        LEFT JOIN latest_explain e
           USING (thread_id)
         ORDER BY t.last_message_ts DESC
         LIMIT @limit

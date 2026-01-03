@@ -10,12 +10,21 @@ from typing import List, Dict, Any
 
 def get_threads(limit: int) -> List[Dict[str, Any]]:
     """
-    Return mock thread data matching the v_thread_list view structure.
+    Return mock thread data matching the v_thread_state_final view structure.
     Generates up to 200 threads for realistic testing.
     """
     base_time = datetime.utcnow()
     threads = []
     max_threads = min(limit, 200)
+    
+    next_action_options = ["org", "customer", "none"]
+    status_reasons = [
+        "Customer is asking a question and waiting for a response.",
+        "Issue has been resolved and no further action is needed.",
+        "Awaiting customer's confirmation or additional information.",
+        "Thread is closed as the matter has been concluded.",
+        "Organization needs to follow up on the customer's request.",
+    ]
     
     for i in range(max_threads):
         # Vary timestamps more realistically (hours, days, weeks)
@@ -26,23 +35,45 @@ def get_threads(limit: int) -> List[Dict[str, Any]]:
         else:
             thread_time = base_time - timedelta(weeks=(i - 150) // 10)
         
-        sentiment_options = ["pos", "neg", "neutral"]
-        sentiment = sentiment_options[i % 3]
+        sentiment_options = ["Happy", "Bit Irritated", "Moderately Concerned", "Anger", "Frustrated"]
+        sentiment = sentiment_options[i % 5]
         
         # Vary confidence more realistically
         confidence_base = 0.65 + (i % 5) * 0.05
-        confidence = round(confidence_base + (0.1 if sentiment == "pos" else -0.05), 2)
+        confidence = round(confidence_base + (0.1 if sentiment == "Happy" else -0.05), 2)
         
-        threads.append({
+        thread_status = "open" if i % 4 != 0 else "closed"
+        # Alternate between LLM and heuristic explanations
+        has_llm_explain = i % 3 != 0  # ~67% have LLM explanations
+        
+        thread_data = {
             "thread_id": f"t-{str(i+1).zfill(6)}",
             "last_message_ts": thread_time.isoformat(),
             "message_count": (i % 20) + 1,
-            "thread_status": "open" if i % 4 != 0 else "closed",
+            "thread_status": thread_status,
             "sentiment": sentiment,
             "confidence": confidence,
             "prompt_version": f"v0.{(i % 3) + 1}",
-            "model_name": "gemini" if i % 2 == 0 else "gpt-4"
-        })
+            "model_name": "gemini-2.0-flash" if i % 2 == 0 else "gpt-4",
+        }
+        
+        # Add LLM explanation fields if available
+        if has_llm_explain:
+            thread_data.update({
+                "next_action_owner": next_action_options[i % 3],
+                "status_reason": status_reasons[i % len(status_reasons)],
+                "status_source": "llm",
+                "status_confidence": round(0.7 + (i % 3) * 0.1, 2),
+            })
+        else:
+            thread_data.update({
+                "next_action_owner": None,
+                "status_reason": None,
+                "status_source": "heuristic",
+                "status_confidence": None,
+            })
+        
+        threads.append(thread_data)
     
     return threads
 
